@@ -1,0 +1,8 @@
+# Archivos comprimidos pesados
+*.tgz
+
+# Datos en bruto (CSV grandes)
+brain_bruto_1h.csv
+brain_bruto_1min.csv
+
+brain_CORE_1min.csv
