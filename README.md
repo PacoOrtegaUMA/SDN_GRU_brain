@@ -1,144 +1,144 @@
 # SDN_GRU_brain
 
-Código de entrenamiento, evaluación y análisis de predicción de tráfico de red sobre el dataset **BRAIN** (Berlin Research Area Information Network) usando arquitecturas basadas en GRU con un framework jerárquico de dos niveles.
+Training, evaluation and analysis code for network traffic prediction on the **BRAIN** (Berlin Research Area Information Network) dataset, using GRU-based architectures within a two-level hierarchical forecasting framework.
 
 ---
 
-## Estructura del repositorio
+## Repository Structure
 
 ```
 SDN_GRU_brain/
 │
-├── brain_FINAL_1h.csv          # Dataset BRAIN granularidad horaria (no incluido, ver Dataset)
-├── brain_FINAL_1min.csv        # Dataset BRAIN granularidad minuto (no incluido, ver Dataset)
+├── brain_FINAL_1h.csv          # BRAIN dataset — hourly granularity (not included, see Dataset)
+├── brain_FINAL_1min.csv        # BRAIN dataset — minute granularity (not included, see Dataset)
 │
-├── TrainArq_h.py               # Entrenamiento de las 4 arquitecturas a nivel horario
-├── TrainArq_min.py             # Entrenamiento de las 4 arquitecturas a nivel minuto (con anchor ω)
-├── TestArq_h.py                # Evaluación de modelos horarios sobre el conjunto de test
-├── TestArq_min.py              # Evaluación de modelos de minuto sobre el conjunto de test
-├── TestBaseline.py             # Evaluación de baselines ARIMA y Naive (horario y minuto)
+├── TrainArq_h.py               # Train the 4 architectures at hourly level
+├── TrainArq_min.py             # Train the 4 architectures at minute level (with anchor ω)
+├── TestArq_h.py                # Evaluate hourly models on the test set
+├── TestArq_min.py              # Evaluate minute-level models on the test set
+├── TestBaseline.py             # Evaluate ARIMA and Naive baselines (hourly and minute)
 │
-├── MostrarResults_h.ipynb      # Notebook: análisis y visualización de resultados horarios
-├── MostrarResults_min.ipynb    # Notebook: análisis y visualización de resultados de minuto
-├── PreProceDatos.ipynb         # Notebook: preprocesamiento del dataset BRAIN
+├── MostrarResults_h.ipynb      # Notebook: analysis and visualisation of hourly results
+├── MostrarResults_min.ipynb    # Notebook: analysis and visualisation of minute-level results
+├── PreProceDatos.ipynb         # Notebook: BRAIN dataset preprocessing
 │
-├── Models_horas/               # Modelos entrenados a nivel horario
-│   └── models_ArqX_1h_{A|B}_W{24|168}/   # X ∈ {1,2,3,4}, variante A o B, ventana W
+├── Models_horas/               # Saved models — hourly level
+│   └── models_ArqX_1h_{A|B}_W{24|168}/   # X ∈ {1,2,3,4}, variant A or B, window W
 │
-├── Models_min/                 # Modelos entrenados a nivel minuto
+├── Models_min/                 # Saved models — minute level
 │   └── models_ArqX_{5|15}m_{A|B}_W60_p{00|25|50|75}_H{5|15}/
-│       # X ∈ {1,2,3,4}, horizonte 5 o 15 min, variante A o B, peso ω ∈ {0,25,50,75}%
+│       # X ∈ {1,2,3,4}, horizon 5 or 15 min, variant A or B, anchor weight ω ∈ {0,25,50,75}%
 │
-├── Results_horas/              # CSVs de predicciones y métricas horarias
+├── Results_horas/              # CSVs with hourly predictions and metrics
 │   └── results_ArqX_1h_{A|B}_W{24|168}/
 │
-├── Results_min/                # CSVs de predicciones y métricas de minuto
+├── Results_min/                # CSVs with minute-level predictions and metrics
 │   └── results_ArqX_{5|15}m_{A|B}_W60_p{00|25|50|75}_H{5|15}/
 │
-└── requirements.txt            # Entorno conda completo
+└── requirements.txt            # Full reproducible conda environment
 ```
 
 ---
 
-## Arquitecturas implementadas
+## Implemented Architectures
 
-| ID | Nombre | Bloques principales |
+| ID | Name | Main blocks |
 |---|---|---|
 | **Arch1** | GRU | `GRU(64)` → `Dropout(0.2)` → `Dense(32, ReLU)` → `Dense(H)` |
 | **Arch2** | Conv1D + GRU | `Conv1D(64, k=3)` → `LeakyReLU` → `GRU(64)` → `Dense(32, Swish)` → `Dense(H)` |
 | **Arch3** | Conv1D + BiGRU | `Conv1D(64, k=3)` → `LeakyReLU` → `BiGRU(64+64)` → `Dense(32, Swish)` → `Dense(H)` |
 | **Arch4** | Conv1D + BiGRU + Attention | `Conv1D(64, k=3)` → `BiGRU(64+64, return_seq)` → `SelfAttention(128)` → `GAP` → `Dense(64)` → `Dense(32)` → `Dense(H)` |
 
-Cada arquitectura se entrena en dos variantes de salida:
-- **Variante A** — diferencia logarítmica: el modelo predice `Δlog(1+x)`
-- **Variante B** — valor logarítmico: el modelo predice `log(1+x)` directamente *(recomendada)*
+Each architecture is trained under two output variants:
+- **Variant A** — log difference: the model predicts `Δlog(1+x)`
+- **Variant B** — log value: the model predicts `log(1+x)` directly *(recommended)*
 
 ---
 
-## Framework jerárquico de dos niveles
+## Two-Level Hierarchical Framework
 
 ```
-Level 1 (horario)
-  └─ Entrena Arch2_B con W=24 sobre la serie horaria (375 días)
-  └─ Genera predicciones hourly → guardadas en Results_horas/
+Level 1 — Hourly
+  └─ Trains Arch2_B with W=24 on the hourly series (375 days)
+  └─ Generates hourly predictions → saved in Results_horas/
 
-Level 2 (minuto)
-  └─ Carga la predicción horaria como señal macro (anchor ω)
-  └─ Entrena ArqX con ventana W=60 y peso ω ∈ {0%, 25%, 50%, 75%}
-  └─ Horizontes: T+5 min y T+15 min
+Level 2 — Minute
+  └─ Loads the hourly prediction as macro signal (anchor ω)
+  └─ Trains ArqX with window W=60 and weight ω ∈ {0%, 25%, 50%, 75%}
+  └─ Horizons: T+5 min and T+15 min
 ```
 
-El anchor `ω` se concatena a la ventana de entrada como característica adicional:
+The anchor `ω` is concatenated to the input window as an additional feature:
 `u_t = [x_{t-W+1:t}, ω · ŷ_hourly]`
 
-Cuando `ω = 0`, el modelo Level 2 opera sin información jerárquica.
+When `ω = 0`, the Level 2 model operates without hierarchical information.
 
 ---
 
 ## Dataset
 
-El dataset **BRAIN** está disponible públicamente en el repositorio [SNDlib](http://sndlib.zib.de/) (Zuse Institute Berlin).
+The **BRAIN** dataset is publicly available from the [SNDlib repository](http://sndlib.zib.de/) (Zuse Institute Berlin).
 
-Tras descargarlo, ejecutar `PreProceDatos.ipynb` para generar los ficheros:
-- `brain_FINAL_1h.csv` — serie horaria por enlace con features temporales (hour_sin, hour_cos, day_sin, day_cos, is_weekend)
-- `brain_FINAL_1min.csv` — serie de 5 minutos por enlace con las mismas features
+After downloading, run `PreProceDatos.ipynb` to generate:
+- `brain_FINAL_1h.csv` — per-link hourly series with temporal features (hour_sin, hour_cos, day_sin, day_cos, is_weekend)
+- `brain_FINAL_1min.csv` — per-link 5-minute series with the same features
 
-La red BRAIN tiene 9 nodos principales (ADH, CVK, HTW, HU, SPK, TU, UP, WIAS, ZIB), resultando en **81 enlaces** tras la agregación jerárquica (incluyendo self-loops intra-nodo).
+The BRAIN network has 9 main nodes (ADH, CVK, HTW, HU, SPK, TU, UP, WIAS, ZIB), resulting in **81 links** after hierarchical aggregation (including intra-node self-loops).
 
 ---
 
-## Uso
+## Usage
 
-### 1. Instalar el entorno
+### 1. Set up the environment
 
 ```bash
 conda create --name sdn_gru --file requirements.txt
 conda activate sdn_gru
 ```
 
-O con pip (dependencias mínimas):
+Or with pip (minimal dependencies):
 
 ```bash
 pip install tensorflow>=2.10 numpy pandas scikit-learn statsmodels matplotlib joblib
 ```
 
-### 2. Preprocesar los datos
+### 2. Preprocess the data
 
-Ejecutar el notebook `PreProceDatos.ipynb` con los ficheros raw del dataset BRAIN para generar los CSV procesados.
+Run the notebook `PreProceDatos.ipynb` with the raw BRAIN dataset files to generate the processed CSVs.
 
-### 3. Entrenar modelos horarios (Level 1)
+### 3. Train hourly models (Level 1)
 
-Editar en `TrainArq_h.py` los parámetros deseados:
+Edit the desired parameters at the top of `TrainArq_h.py`:
 
 ```python
-ARQUITECTURA = 2      # 1, 2, 3 o 4
-MODO         = "B"    # "A" o "B"
-W            = 24     # 24 o 168
+ARQUITECTURA = 2      # 1, 2, 3 or 4
+MODO         = "B"    # "A" or "B"
+W            = 24     # 24 or 168
 ```
 
 ```bash
 python TrainArq_h.py
 ```
 
-Los modelos se guardan en `Models_horas/models_Arq{N}_1h_{modo}_W{W}/`.
+Models are saved to `Models_horas/models_Arq{N}_1h_{mode}_W{W}/`.
 
-### 4. Evaluar modelos horarios
+### 4. Evaluate hourly models
 
 ```bash
 python TestArq_h.py
 ```
 
-Los resultados CSV se guardan en `Results_horas/results_Arq{N}_1h_{modo}_W{W}/`.
+Result CSVs are saved to `Results_horas/results_Arq{N}_1h_{mode}_W{W}/`.
 
-### 5. Entrenar modelos de minuto (Level 2)
+### 5. Train minute-level models (Level 2)
 
-Editar en `TrainArq_min.py`:
+Edit the desired parameters at the top of `TrainArq_min.py`:
 
 ```python
-ARQUITECTURA = 4      # 1, 2, 3 o 4
-MODO         = "B"    # "A" o "B"
-OMEGA        = 0.25   # 0.0, 0.25, 0.50, 0.75
-HORIZONTE    = 5      # 5 o 15 (minutos)
+ARQUITECTURA = 4      # 1, 2, 3 or 4
+MODO         = "B"    # "A" or "B"
+OMEGA        = 0.25   # 0.0, 0.25, 0.50 or 0.75
+HORIZONTE    = 5      # 5 or 15 (minutes)
 W            = 60
 ```
 
@@ -146,54 +146,52 @@ W            = 60
 python TrainArq_min.py
 ```
 
-### 6. Evaluar baselines (ARIMA + Naive)
+### 6. Evaluate baselines (ARIMA + Naive)
 
 ```bash
-# Para granularidad horaria:
-# Editar TIPO = "1h" en TestBaseline.py
+# For hourly granularity — set TIPO = "1h" in TestBaseline.py
 python TestBaseline.py
 
-# Para granularidad minuto:
-# Editar TIPO = "1min" en TestBaseline.py
+# For minute granularity — set TIPO = "1min" in TestBaseline.py
 python TestBaseline.py
 ```
 
-### 7. Visualizar resultados
+### 7. Visualise results
 
-Abrir los notebooks:
-- `MostrarResults_h.ipynb` — tablas y gráficas de resultados horarios
-- `MostrarResults_min.ipynb` — tablas, gráficas MAPE vs ω y win-rate vs ARIMA
+Open the notebooks:
+- `MostrarResults_h.ipynb` — tables and plots for hourly results
+- `MostrarResults_min.ipynb` — MAPE vs ω plots and win-rate against ARIMA
 
 ---
 
-## Convención de nombres
+## Naming Convention
 
-Los directorios siguen el patrón:
+Directories follow this pattern:
 
 ```
 {Models|Results}_{horas|min}/
   {models|results}_Arq{1|2|3|4}_{1h|5m|15m}_{A|B}_W{window}_[p{omega}_H{horizon}]/
 ```
 
-Ejemplos:
+Examples:
 - `models_Arq4_5m_B_W60_p25_H5` → Arch4, Variant B, T+5 min, W=60, ω=25%
-- `results_Arq2_1h_B_W24` → Arch2, Variant B, horario, W=24
+- `results_Arq2_1h_B_W24` → Arch2, Variant B, hourly, W=24
 
 ---
 
-## Entorno
+## Environment
 
 - Python 3.11
 - TensorFlow / Keras 3.x
 - CUDA 12.9 + cuDNN 9.x
-- Entrenado en GPU (NVIDIA)
+- Trained on GPU (NVIDIA)
 
-Ver `requirements.txt` para el entorno conda completo reproducible.
+See `requirements.txt` for the full reproducible conda environment.
 
 ---
 
-## Créditos
+## Credits
 
 Francisco Ortega-Zamorano · Esteban J. Palomo · Leonardo Franco  
-Universidad de Málaga — Dpto. Lenguajes y Ciencias de la Computación / ITIS Software  
-Financiado por MICINN · PID2024-155334OB-I00 (con fondos FEDER)
+University of Málaga — Dept. of Languages and Computer Science / ITIS Software  
+Funded by MICINN · PID2024-155334OB-I00 (co-funded by FEDER)
