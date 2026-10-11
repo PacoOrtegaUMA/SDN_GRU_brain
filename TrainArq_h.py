@@ -183,7 +183,7 @@ def entrenar(ID, ventana, modo="A"):
             model = crear_modelo(ID, (W, n_features))
             model.fit(
                 X_tr, Y_tr,
-                validation_data=(X_te, Y_te),
+                validation_split=0.15,
                 epochs=EPOCHS,
                 batch_size=BATCH_SIZE,
                 callbacks=[
